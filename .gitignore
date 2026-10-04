@@ -1,0 +1,37 @@
+# large / generated artifacts — not committed (docs/spec.md §20)
+paper-*.jar
+paper-*.jar:Zone.Identifier
+plugins/*.jar
+worlds/
+runs/
+smoke/
+probe/
+bots/node_modules/
+logs/
+cache/
+libraries/
+versions/
+world/
+world_nether/
+world_the_end/
+workspaces/
+*.log
+cmd.fifo
+
+# server runtime state (regenerated per workspace)
+.paper/
+banned-ips.json
+banned-players.json
+ops.json
+usercache.json
+whitelist.json
+commands.yml
+plugins/bStats/
+plugins/spark/
+plugins/TickLogger/
+plugins/ViaVersion/
+plugins/ViaBackwards/
+
+# build outputs
+ticklogger/out/
+__pycache__/

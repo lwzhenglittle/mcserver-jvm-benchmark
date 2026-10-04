@@ -1,0 +1,126 @@
+# JDK manifest for Paper 26.2 benchmark
+# Generated 2026-09-30 from scripts/probe-jdk.sh results (probe/ directory holds raw evidence).
+# java_major: 25 (main experiment). Do not mix with 26/27 extension runs.
+# All homes are sdkman-managed; graalvmoracle25 was installed manually from download.oracle.com
+# (sdkman broker 404) — SHA256 76007c30...ea37276 verified.
+jdks:
+  temurin25:
+    family: hotspot
+    jit: c2
+    vendor: eclipse-adoptium
+    java_major: 25
+    version: "25.0.4+7-LTS"
+    sdkman_id: 25.0.4-tem
+    home: ~/.sdkman/candidates/java/25.0.4-tem
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot   # -XX:+UseG1GC ...
+    role: core-baseline
+
+  corretto25:
+    family: hotspot
+    jit: c2
+    vendor: amazon
+    java_major: 25
+    version: "25.0.4"
+    sdkman_id: 25.0.4-amzn
+    home: ~/.sdkman/candidates/java/25.0.4-amzn
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: core-baseline
+
+  microsoft25:
+    family: hotspot
+    jit: c2
+    vendor: microsoft
+    java_major: 25
+    version: "25.0.4+1"
+    sdkman_id: 25.0.4+1-ms
+    home: ~/.sdkman/candidates/java/25.0.4+1-ms
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: vendor-extension
+
+  oracle25:
+    family: hotspot
+    jit: c2
+    vendor: oracle
+    java_major: 25
+    version: "25.0.4"
+    sdkman_id: 25.0.4-oracle
+    home: ~/.sdkman/candidates/java/25.0.4-oracle
+    gcs: [g1, zgc, parallel, serial]   # no Shenandoah (probe verified)
+    gc_flag_style: hotspot
+    role: vendor-extension
+
+  zulu25:
+    family: hotspot
+    jit: c2
+    vendor: azul
+    java_major: 25
+    version: "25.0.4+1.1"
+    sdkman_id: 25.0.4+1.1-zulu
+    home: ~/.sdkman/candidates/java/25.0.4+1.1-zulu
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: vendor-extension
+
+  liberica25:
+    family: hotspot
+    jit: c2
+    vendor: bellsoft
+    java_major: 25
+    version: "25.0.4+1.1"
+    sdkman_id: 25.0.4+1.1-librca
+    home: ~/.sdkman/candidates/java/25.0.4+1.1-librca
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: vendor-extension
+
+  sapmachine25:
+    family: hotspot
+    jit: c2
+    vendor: sap
+    java_major: 25
+    version: "25.0.4+1"
+    sdkman_id: 25.0.4+1-sapmchn
+    home: ~/.sdkman/candidates/java/25.0.4+1-sapmchn
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: vendor-extension
+
+  graalvmce25:
+    family: hotspot
+    jit: graal
+    vendor: graalvm-community
+    java_major: 25
+    version: "25.0.4.1+1 (GraalVM CE 25.3.4.1, jvmci-25.3-b22)"
+    sdkman_id: 25.3.4+1.r25-graalce
+    home: ~/.sdkman/candidates/java/25.3.4+1.r25-graalce
+    gcs: [g1, zgc, parallel, shenandoah, serial]
+    gc_flag_style: hotspot
+    role: jit-comparison
+
+  graalvmoracle25:
+    family: hotspot
+    jit: graal
+    vendor: oracle-graalvm
+    java_major: 25
+    version: "25.0.4+7-LTS-jvmci-b01 (Oracle GraalVM 25.0.4+7.1)"
+    sdkman_id: 25.0.4-graal
+    home: ~/.sdkman/candidates/java/25.0.4-graal
+    gcs: [g1, zgc, parallel, serial]   # no Shenandoah (probe verified)
+    gc_flag_style: hotspot
+    license: GFTC (evaluation/benchmark use)
+    role: jit-comparison
+
+  semeru25:
+    family: openj9
+    jit: openj9
+    vendor: ibm
+    java_major: 25
+    version: "25.0.4+7 (OpenJ9 0.60.0)"
+    sdkman_id: 25.0.4-sem
+    home: ~/.sdkman/candidates/java/25.0.4-sem
+    gcs: [gencon, balanced, optavgpause, optthruput]
+    gc_flag_style: openj9    # -Xgcpolicy:<name>; NO HotSpot -XX:+Use* flags
+    role: jit-comparison

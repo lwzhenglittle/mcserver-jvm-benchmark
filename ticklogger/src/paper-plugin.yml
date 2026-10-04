@@ -1,0 +1,6 @@
+type: paper
+name: TickLogger
+version: '1.0'
+main: bench.TickLogger
+api-version: '1.21'
+description: Per-tick MSPT recorder for JVM/GC benchmark harness
