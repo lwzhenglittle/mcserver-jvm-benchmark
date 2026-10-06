@@ -10,12 +10,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SDK="$HOME/.sdkman/candidates/java"
 
 RUNTIME=temurin25; GC=g1; PLAYERS=10; WARMUP=600; MEASURE=900; SEED=20260930
-WORKLOAD=mixed; WS="$ROOT"; PORT=25565; CORES="0-7"; BOTCORES="8-15"; HEAP=8G
+WORKLOAD=mixed; WS="$ROOT"; PORT=25565; CORES="0-7"; BOTCORES="8-15"; HEAP=8G; BOTVER=26.1
 while [[ $# -gt 1 ]]; do
   case "$1" in
     --runtime) RUNTIME=$2;; --gc) GC=$2;; --players) PLAYERS=$2;; --workload) WORKLOAD=$2;;
     --warmup) WARMUP=$2;; --measure) MEASURE=$2;; --seed) SEED=$2;;
-    --workspace) WS=$2;; --port) PORT=$2;; --cores) CORES=$2;; --botcores) BOTCORES=$2;; --heap) HEAP=$2;;
+    --workspace) WS=$2;; --port) PORT=$2;; --cores) CORES=$2;; --botcores) BOTCORES=$2;; --heap) HEAP=$2;; --botversion) BOTVER=$2;;
     *) echo "unknown arg $1"; exit 1;;
   esac
   shift 2
@@ -104,7 +104,7 @@ for s in $(seq 0 $((SHARDS-1))); do
   # join ramp: >100 players -> global ~1 bot/s to avoid login-storm keepalive kicks
   STAGGER=500; (( PLAYERS > 100 )) && STAGGER=$((SHARDS*1000))
   ( cd "$ROOT/bots" && taskset -c "$BOTCORES" node bot.js --count "$cnt" --port "$PORT" \
-      --seed "$SEED" --mode "$WORKLOAD" --offset "$off" --stagger "$STAGGER" ) > "$RD/bots.$s.log" 2>&1 &
+      --seed "$SEED" --mode "$WORKLOAD" --offset "$off" --stagger "$STAGGER" --version "$BOTVER" ) > "$RD/bots.$s.log" 2>&1 &
   BPIDS+=($!)
 done
 echo "--- cold start boundary $(date -Is) ---" >> "$RD/markers.log"
@@ -154,8 +154,8 @@ cat > "$RD/metadata.json" <<EOF
   "world_checksum": "$WCSUM",
   "paper_jar": "paper-26.2-129.jar",
   "paper_sha256": "b1d8f6bfa1b6101fa8e947b53041cb3bdf5540e7b83b6547ca19ba7edefeb083",
-  "plugins": ["ViaVersion-5.12.1-SNAPSHOT+1080", "ViaBackwards-5.12.1-SNAPSHOT+643", "Chunky-Bukkit-1.5.3", "TickLogger-1.0"],
-  "bot_client_version": "26.1 (via ViaBackwards, server 26.2 protocol 776)",
+  "plugins": [$(ls "$WS/plugins" | grep '\.jar$' | sed 's/\.jar$//' | sed 's/.*/"&"/' | paste -sd,)],
+  "bot_client_version": "$BOTVER",
   "port": $PORT,
   "workspace": "$(basename "$WS")",
   "cores": "$CORES",

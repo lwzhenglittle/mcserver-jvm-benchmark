@@ -10,7 +10,7 @@
 - ≤100 人时 JDK/GC 选择几乎无差异(<2ms,噪声级);>100 人时 ZGC/Shenandoah 比 G1 好 ~35%,Parallel 最差
 - baseline(openjdk25/oracle25 零参数)≈ temurin25+G1+16G——**厂商无魔法,差距全在 GC**
 
-详细数据:[docs/round2-results.md](docs/round2-results.md)、[docs/round1-results.md](docs/round1-results.md)
+详细数据:[docs/round2-results.md](docs/round2-results.md)、[docs/round1-results.md](docs/round1-results.md)、[docs/round3-novia.md](docs/round3-novia.md)(Via 开销实验:原生 26.2 bot 反而慢 ~19%)
 
 ## 实验总览
 
