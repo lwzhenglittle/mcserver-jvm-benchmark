@@ -8,10 +8,12 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SEED=20260930
-RUNS=3; DRY=0
+RUNS=3; DRY=0; WS=ws0; PORT=25565; BOTVER=26.1; LOGSUFFIX=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --runs) RUNS=$2; shift 2;; --dry-run) DRY=1; shift;;
+    --workspace) WS=$2; shift 2;; --port) PORT=$2; shift 2;;
+    --botversion) BOTVER=$2; LOGSUFFIX="-novia"; shift 2;;
     *) echo "unknown arg $1"; exit 1;;
   esac
 done
@@ -36,7 +38,7 @@ done
 IFS=$'\n' SORTED=($(printf '%s\n' "${PLAN[@]}" | sort)); unset IFS
 TOTAL=${#SORTED[@]}
 
-LOG="$ROOT/runs/scaling.log"
+LOG="$ROOT/runs/scaling$LOGSUFFIX.log"
 mkdir -p "$ROOT/runs"
 echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600" >> "$LOG"
 
@@ -48,8 +50,8 @@ for line in "${SORTED[@]}"; do
   if [[ $DRY -eq 1 ]]; then echo "[$i/$TOTAL] $runtime $gc p$p rep$r"; continue; fi
   echo "[$i/$TOTAL] $(date -Is) $runtime $gc p$p rep$r START" >> "$LOG"
   if "$ROOT/scripts/run-min-bench.sh" --runtime "$runtime" --gc "$gc" --workload "$WL" \
-       --players "$p" --warmup 600 --measure 600 --seed "$SEED" --heap 16G \
-       --workspace "$ROOT/workspaces/ws0" --port 25565 \
+       --players "$p" --warmup 600 --measure 600 --seed "$SEED" --heap 16G --botversion "$BOTVER" \
+       --workspace "$ROOT/workspaces/$WS" --port "$PORT" \
        --cores 0-7 --botcores 8-15 >> "$LOG" 2>&1; then
     echo "[$i/$TOTAL] $runtime $gc p$p rep$r DONE" >> "$LOG"
   else
