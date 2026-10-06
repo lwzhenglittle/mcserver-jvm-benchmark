@@ -44,8 +44,14 @@
 
 - **golden world**:固定 seed,Chunky 预生成 r=512 区块,另建 entity-redstone 压力区(实体+红石);
   每轮运行前整目录恢复并校验 sha256,保证每轮世界逐字节一致
-- **bot 负载**:mineflayer 无头客户端(26.1 协议,经 ViaBackwards 连 26.2),确定
-  性随机(seed=20260930),三种 workload:
+- **bot 负载**:mineflayer 无头客户端,确定性随机(seed=20260930)。协议两种支持:
+  - 26.1 协议 + 服务器装 ViaVersion/ViaBackwards(**两轮矩阵的实际配置**)
+  - **原生 26.2 协议(776)**:`node bots/add-26.2.js` 后 `--version 26.2`,服务器无需 Via 插件。
+    原理:ViaBackwards `Protocol26_2To26_1` 证明包 ID 完全不变,线格式仅 3 处差异(login success 追加
+    session UUID、packet_teams 字段重排且 color 变 optional varint、join game 追加 1 字节标志位);
+    补丁将 minecraft-data 26.1 数据复制为 26.2 并修正这 3 处。已实测:无 Via 服务器 3 bot
+    spawn/行走/挖掘 60s 无任何报错。26.2 新内容语义对负载生成无影响。
+  三种 workload:
   - `mixed`:随机行走冲刺 + 40% 跳跃 + 50% 挖掘 + 30% 挥手,离原点 >400 格自动折返(约束在预生界内)
   - `explore`:持续向外探索(chunk 生成/加载压力)
   - `entity`:entity-redstone 区附近活动(实体/红石压力)
