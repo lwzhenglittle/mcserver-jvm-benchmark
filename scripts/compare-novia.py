@@ -17,6 +17,8 @@ def load(path):
     for k, rows in cells.items():
         out[k] = {m: statistics.median(float(r[m]) for r in rows) for m in
                   ('mean_mspt', 'p95_mspt', 'p99_mspt', 'max_mspt', 'tps')}
+        out[k]['reps'] = len(rows)
+        out[k]['kicks'] = sum(int(r['bot_kicks']) for r in rows)
     return out
 
 import os

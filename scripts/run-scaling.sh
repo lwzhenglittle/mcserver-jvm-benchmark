@@ -40,7 +40,7 @@ TOTAL=${#SORTED[@]}
 
 LOG="$ROOT/runs/scaling$LOGSUFFIX.log"
 mkdir -p "$ROOT/runs"
-echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600" >> "$LOG"
+[[ $DRY -eq 0 ]] && echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600" >> "$LOG"
 
 i=0
 for line in "${SORTED[@]}"; do
