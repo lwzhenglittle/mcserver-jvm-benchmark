@@ -5,12 +5,9 @@
 
 ## TL;DR
 
-- **推荐:`temurin25 -XX:+UseZGC -Xms16G -Xmx16G`**(或 Shenandoah)
-- 8 核(Ryzen 7 5700X,WSL2)容量上限 **~150 并发玩家**(mixed 负载);200 人服务器崩溃性过载
-- ≤100 人时 JDK/GC 选择几乎无差异(<2ms,噪声级);>100 人时 ZGC/Shenandoah 比 G1 好 ~35%,Parallel 最差
-- baseline(openjdk25/oracle25 零参数)≈ temurin25+G1+16G——**厂商无魔法,差距全在 GC**
-
-详细数据:[docs/round2-results.md](docs/round2-results.md)、[docs/round1-results.md](docs/round1-results.md)、[docs/round3-novia.md](docs/round3-novia.md)(Via 开销实验:无可测影响;含一次时间聚块伪影的勘误记录)
+> **Round 4(no-Via 全量重做)进行中**:84 轮矩阵,2026-10-08 启动,ETA ~28h。
+> 结论将以 [docs/round4-novia.md](docs/round4-novia.md) 为准。
+> 历史数据(R1/R2/R3)已移出展示,存档于 [docs/archive/](docs/archive/)(含一次时间聚块伪影的勘误记录);原始 runs/ 全部保留未删。
 
 ## 实验总览
 
@@ -29,7 +26,7 @@
 ```
 bots/            mineflayer 无头玩家负载发生器(bot.js)
 config/          固定配置:jdks.yaml(运行时清单)、paper-*.yml、server/(server.properties 等)
-docs/            spec.md(实验需求)、methodology.md(方法学)、round1/round2-results.md、exploration.md
+docs/            spec.md(实验需求)、methodology.md(方法学)、round4-novia.md(进行中)、archive/(R1-R3 历史数据)
 results/         round1-runs.csv(99)、round2-runs.csv(84)、round1-summary.csv
 scripts/         全部 harness:run-min-bench.sh(单轮)、run-matrix.sh(R1)、run-scaling.sh(R2)、
                  aggregate.py(聚合)、build-golden-world.sh、mk-workspace.sh、proc-collect.sh、smoke-paper.sh
@@ -60,4 +57,4 @@ python3 scripts/aggregate.py 'runs/*'    # 聚合每轮统计到 CSV
 - AMD Ryzen 7 5700X(8C/16T,SMT 开),62GB RAM,单 NUMA
 - **WSL2**(kernel 6.18.33.2-microsoft-standard),ext4 on vhdx——非裸机,governor/perf 不可控
 - Paper **26.2-129**(sha256 锁定,要求 Java 25+),Java 25 运行时矩阵
-- 插件:TickLogger(自研)、Chunky(pregen)、spark、ViaVersion/ViaBackwards(bot 用 26.1 协议)
+- 插件:TickLogger(自研)、Chunky(pregen)、spark;**bot 走原生 26.2 协议,不装 Via*(R4 起;R3 已证明 Via 无可测影响)**

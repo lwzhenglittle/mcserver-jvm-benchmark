@@ -30,7 +30,7 @@ PLAN=()
 for cfg in "${CONFIGS[@]}"; do
   for p in "${PLAYER_LEVELS[@]}"; do
     for r in $(seq 1 "$RUNS"); do
-      h=$(echo "$SEED|r2|$cfg|$p|$r" | md5sum | cut -d' ' -f1)
+      h=$(echo "$SEED|r4|$cfg|$p|$r" | md5sum | cut -d' ' -f1)
       PLAN+=("$h $cfg $p $r")
     done
   done
