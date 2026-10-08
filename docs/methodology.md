@@ -94,6 +94,10 @@
 4. **heap 必须 -Xms=-Xmx 且全组合一致**;baseline 例外(测的就是默认行为,metadata 标记 `default`)。
 5. 过载测量有效性以 **bot 存活率** 为准:p150 全部存活可测;p200 全灭,剔除该档。
 6. sdkman 的 `sdk install` 交互提示不吃 `SDKMAN_AUTO_ANSWER`,需 `yes n |` 供 stdin(安装 22 个 JDK 时的坑)。
+7. **A/B 比较必须交错执行(A/B/A/B),绝不按处理分块**。WSL2 共享宿主负载有小时级漂移
+   (同配置跨小时可差 17%);分块 A/B 会把环境趋势测成处理效应——rep 内一致只证明块内环境
+   稳定。R3 曾因此误判"去 Via 慢 19%",交错重测证伪(见 round3-novia.md)。跨日的矩阵间
+   逐格对比同理不可做;单矩阵内靠 seeded shuffle 把组合打散到整个时段来保证内部公平。
 
 ## 8. 统计
 

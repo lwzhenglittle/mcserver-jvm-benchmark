@@ -1,58 +1,62 @@
-# Round 3: no-Via + 原生 26.2 全矩阵复现(Via 开销实验)
+# Round 3: ViaVersion 开销实验 —— 结论修正(2026-10-08 勘误)
 
-**问题**:R1/R2 的 bot 都经 ViaBackwards(26.1 客户端 → 26.2 服务器)。Via 层影响多大?结论在无 Via 下是否成立?
+> ⚠️ **勘误**:本文档早先版本(基于跨日矩阵对比)声称"去掉 Via 慢 ~19%"。
+> 经 10-08 交错对照实验证明该结论是**时间聚块伪影**,特此撤回。正确结论见下。
 
-**方法**:完整复现 R2——7 组合 × p{25,50,100,150} × 3 reps = 84 轮,同 seed 同执行顺序,
-服务器无 Via 插件,bot 用原生 26.2 协议(`bots/add-26.2.js` 补丁)。**84/84 完成,0 失败,0 掉线。**
-数据:[../results/round2-novia-runs.csv](../results/round2-novia-runs.csv);对比脚本:`scripts/compare-novia.py`。
+## 最终结论
 
-## 核心结果:mean MSPT(noVia vs Via,rep 中位数)
+**ViaVersion/ViaBackwards 转发对 Paper 26.2 服务器性能无可测影响(±1ms 内)。**
+原生 26.2 与经 Via 的 26.1 客户端,MSPT 无差异。
 
-| 组合 | p25 | p50 | p100 | p150 |
+## 证据链
+
+### 1. 交错 A/B(正确方法,10-08 同日同环境背靠背)
+
+| 对 | 顺序 | Via mean | noVia mean | Δ |
 |---|---|---|---|---|
-| openjdk25 默认 | 7.90 (−1.0%) | 9.69 (+7.6%) | 17.95 (+8.9%) | 76.19 (+3.0%) |
-| oracle25 默认 | 8.06 (+16.5%) | 10.29 (+6.9%) | 18.08 (+8.0%) | 80.60 (+2.2%) |
-| temurin25 g1 | 8.82 (+16.3%) | 11.02 (+6.5%) | 19.31 (+17.2%) | 77.56 (+12.8%) |
-| temurin25 shenandoah | 8.54 (+2.7%) | 10.54 (+5.4%) | 18.18 (+14.9%) | 47.70 (−0.6%) |
-| temurin25 parallel | 8.59 (+11.7%) | 10.68 (+15.1%) | 18.56 (+10.5%) | 90.70 (+0.5%) |
-| temurin25 zgc | 9.28 (−1.5%) | 11.56 (+6.8%) | 18.84 (+17.4%) | **37.87 (−20.4%)** |
-| graalvmce25 g1 | 8.18 (+16.0%) | 10.86 (+26.6%) | 18.44 (+16.1%) | 78.05 (+13.5%) |
+| 1 | A→B | 18.58 | 18.55 | −0.03ms |
+| 2 | B→A | 17.27 | 18.09 | +0.82ms |
+| 3 | A→B(300s warmup + JFR) | 21.19 | 20.23 | −0.96ms |
 
-## p150 TPS(达成 tick 率)
+三对全部在噪声内(±1ms)。temurin25+g1, p100, mixed, 16G, 600s warmup/600s measure。
 
-| 组合 | Via | noVia |
-|---|---|---|
-| temurin25 **zgc** | 18.8 | **19.9** |
-| temurin25 **shenandoah** | 19.2 | 19.0 |
-| temurin25 g1 | 14.5 | 12.9 |
-| graalvmce25 g1 | 14.5 | 12.8 |
-| openjdk25 默认 | 13.5 | 13.1 |
-| oracle25 默认 | 12.7 | 12.4 |
-| temurin25 parallel | 11.1 | 11.0 |
+### 2. JFR 火焰图 A/B(10-08,p100,150s profile)
 
-## 结论
+- Server 线程 CPU 样本数相等(1403 vs 1361/180s)
+- park 总时长相等(158.7s vs 159.1s)
+- 零锁竞争、零主线程 socket/文件 IO
+- 热点帧分布无结构性差异
 
-1. **R1/R2 的组合排名与最终推荐对 Via 移除稳健**:p150 过载档前两名仍是 ZGC、Shenandoah,
-   顺序不变;Parallel 依旧垫底。过载拐点仍在 100–150 人之间,未位移。
-2. **Via 转发开销 ≈ 0,但去掉 Via 反而更慢**:亚过载档(p25–p100)noVia mean 普遍 +3%~+17%,
-   与先行对照实验一致(+19%,rep 分布不重叠,同日对照排除了环境漂移)。机制未定位——
-   [推断] 服务器对原生 776 客户端存在对(Via 翻译的)775 客户端不启用的逐玩家代码路径。
-3. **ZGC 在无 Via 下过载表现更强**:p150 mean 37.9ms(比 Via 下还低 20%),TPS 19.9——
-   是唯一 noVia 快于 Via 的组合。ZGC 的亚毫秒暂停在高负载下与网络线程压力的交互更有利。
-4. R2 的绝对数值(Via 配置)对 G1 系组合是**乐观上界**,对 ZGC 是**保守下界**;
-   相对排名两矩阵一致,选型结论不变:**temurin25 + ZGC,heap 16G,容量 ~150 人**。
+### 3. 唯一真实差异:网络流量
 
-## 附:先行对照(2026-10-07,定机理用)
+Paper 内置 JFR `minecraft.NetworkSummary`:原生 26.2 连接 180s 内多收 **+18% 字节**
+(47.7MB vs 40.5MB/100 连接;包数 +5%)。[推断] 26.2 新增内容(注册表条目、新实体/粒子数据)
+不经 ViaBackwards 裁剪故略大。该差异不产生可测 MSPT 影响。
 
-temurin25+g1 p100 单格,3+3+2 reps:Via 10-02 中位 16.48ms / Via 同日 15.87ms / noVia 同日
-18.89ms(+19%)。跨日漂移仅 −3.7%,证明差值来自协议路径而非环境。
+## 原结论为什么是错的(方法论教训)
 
-## 复现
+10-07 的 "Via 15.87 vs noVia 18.89" 看似严谨(同日、rep 分布不重叠),但:
+- noVia 3 reps 全部跑在 **00:05–01:06**,Via 对照跑在 **01:07–01:48**
+- WSL2 共享 Windows 宿主,环境负载有小时级漂移;10-08 同配置 Via 复测得 18.58(与 10-07 的 15.87 差 17%)
+- **分块顺序 A/B 会被环境趋势污染;rep 间一致只证明块内环境稳定,不证明对照有效**
+- 正确做法:A/B 交错(A/B/A/B)或同块随机化
+
+同样地,先前"R2(10-01)vs R3(10-07)全矩阵逐格差值表"因跨日执行**全部作废**;
+两个矩阵各自内部(同块、seeded shuffle)的排名结论不受影响。
+
+## 不再需要的"机制解释"
+
+早前推测"原生 776 客户端触发额外服务器路径"——交错实验证伪,无需进一步定位。
+
+## 可复现
 
 ```bash
-node bots/add-26.2.js        # 注册原生 26.2 协议(幂等,npm ci 后需重跑)
-./scripts/mk-workspace.sh N 25567 && rm workspaces/wsN/plugins/Via*.jar
-./scripts/run-scaling.sh --botversion 26.2 --workspace wsN --port 25567   # 84 轮 ~28h
-python3 scripts/aggregate.py 'runs/*-wsN' > results/round2-novia-runs.csv
-python3 scripts/compare-novia.py
+node bots/add-26.2.js   # 原生 26.2 bot 支持(依然有效且有用:可脱离 Via 插件跑)
+# 交错对:
+./scripts/run-min-bench.sh --runtime temurin25 --gc g1 --players 100 --warmup 600 --measure 600 \
+    --heap 16G --workspace workspaces/ws0 --port 25565 --cores 0-7 --botcores 8-15
+./scripts/run-min-bench.sh --runtime temurin25 --gc g1 --players 100 --warmup 600 --measure 600 \
+    --heap 16G --botversion 26.2 --workspace workspaces/wsN --port 25567 --cores 0-7 --botcores 8-15
 ```
+
+运行目录:`runs/20261008-1*-(ws0|wsN)`(交错对 + JFR 对)、`runs/20261007-0*-wsN`(被证伪的批次)。
