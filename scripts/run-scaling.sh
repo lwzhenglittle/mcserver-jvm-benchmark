@@ -8,12 +8,13 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SEED=20260930
-RUNS=3; DRY=0; WS=ws0; PORT=25565; BOTVER=26.1; LOGSUFFIX=""
+RUNS=3; DRY=0; WS=ws0; PORT=25565; BOTVER=26.1; LOGSUFFIX=""; RESUME_AFTER=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --runs) RUNS=$2; shift 2;; --dry-run) DRY=1; shift;;
     --workspace) WS=$2; shift 2;; --port) PORT=$2; shift 2;;
     --botversion) BOTVER=$2; LOGSUFFIX="-novia"; shift 2;;
+    --resume-after) RESUME_AFTER=$2; shift 2;;  # skip cells already having $RUNS complete runs with dir timestamp >= this (e.g. 20261008-142344)
     *) echo "unknown arg $1"; exit 1;;
   esac
 done
@@ -40,13 +41,34 @@ TOTAL=${#SORTED[@]}
 
 LOG="$ROOT/runs/scaling$LOGSUFFIX.log"
 mkdir -p "$ROOT/runs"
-[[ $DRY -eq 0 ]] && echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600" >> "$LOG"
+[[ $DRY -eq 0 ]] && echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600 resume_after=$RESUME_AFTER" >> "$LOG"
+
+# count completed runs for a cell: dir ts >= RESUME_AFTER and measurement window finished
+declare -A LAUNCHED=()
+cell_done() {
+  local rt=$1 gc=$2 p=$3 d n=0
+  for d in "$ROOT"/runs/*-"$rt-$gc-$WL-p$p-$WS"; do
+    [[ -d $d ]] || continue
+    [[ ${d##*/} > "$RESUME_AFTER" || ${d##*/} == "$RESUME_AFTER"* ]] || continue
+    grep -q "measurement window end" "$d/markers.log" 2>/dev/null && n=$((n+1))
+  done
+  echo $n
+}
 
 i=0
 for line in "${SORTED[@]}"; do
   read -r _ cfg p r <<<"$line"
   runtime=${cfg%%:*}; gc=${cfg#*:}
   i=$((i+1))
+  if [[ -n $RESUME_AFTER ]]; then
+    key="$cfg-$p"; have=$(cell_done "$runtime" "$gc" "$p"); done_n=$((have + ${LAUNCHED[$key]:-0}))
+    if [[ $done_n -ge $RUNS ]]; then
+      [[ $DRY -eq 1 ]] && echo "[$i/$TOTAL] $runtime $gc p$p rep$r SKIP ($have done)"
+      [[ $DRY -eq 0 ]] && echo "[$i/$TOTAL] $(date -Is) $runtime $gc p$p rep$r SKIP ($have done)" >> "$LOG"
+      continue
+    fi
+    LAUNCHED[$key]=$(( ${LAUNCHED[$key]:-0} + 1 ))
+  fi
   if [[ $DRY -eq 1 ]]; then echo "[$i/$TOTAL] $runtime $gc p$p rep$r"; continue; fi
   echo "[$i/$TOTAL] $(date -Is) $runtime $gc p$p rep$r START" >> "$LOG"
   if "$ROOT/scripts/run-min-bench.sh" --runtime "$runtime" --gc "$gc" --workload "$WL" \
