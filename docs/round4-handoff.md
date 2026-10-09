@@ -1,5 +1,9 @@
 # Round 4 交接文档(2026-10-09 ~09:20 暂停,待 WSL 内核升级)
 
+> ✅ **已完成(2026-10-10)**:84/84,0 失败。最终结论见 `docs/round4-novia.md`,
+> 数据 `results/round4-{runs,summary}.csv`,已 commit+push(2e21ab8)。
+> 不要再用下面的 resume 命令。resume 的 LAUNCHED 重复计数 bug 已修(见 round4-novia.md 备注)。
+
 > 给下一个 agent session:读完本文档即可继续,无需翻历史会话。
 
 ## 任务目标
