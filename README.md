@@ -5,8 +5,10 @@
 
 ## TL;DR
 
-> **Round 4(no-Via 全量重做)进行中**:84 轮矩阵,2026-10-08 启动,ETA ~28h。
-> 结论将以 [docs/round4-novia.md](docs/round4-novia.md) 为准。
+> **Round 4(no-Via 全量重做,最终结论,2026-10-10):**
+> p25-p100 全部 7 配置差异在噪声内,随便选;过载点在 p100→p150 之间;
+> p150 上 **Shenandoah/ZGC(~58-59ms)领先 G1 系(78-96ms)~25-39%,Parallel(113ms)垫底**。
+> 会冲 100+ 玩家就用 temurin25 + Shenandoah(或 ZGC)。详见 [docs/round4-novia.md](docs/round4-novia.md)。
 > 历史数据(R1/R2/R3)已移出展示,存档于 [docs/archive/](docs/archive/)(含一次时间聚块伪影的勘误记录);原始 runs/ 全部保留未删。
 
 ## 实验总览
@@ -26,8 +28,8 @@
 ```
 bots/            mineflayer 无头玩家负载发生器(bot.js)
 config/          固定配置:jdks.yaml(运行时清单)、paper-*.yml、server/(server.properties 等)
-docs/            spec.md(实验需求)、methodology.md(方法学)、round4-novia.md(进行中)、archive/(R1-R3 历史数据)
-results/         round1-runs.csv(99)、round2-runs.csv(84)、round1-summary.csv
+docs/            spec.md(实验需求)、methodology.md(方法学)、round4-novia.md(最终结论)、archive/(R1-R3 历史数据)
+results/         round1-runs.csv(99)、round2-runs.csv(84)、round1-summary.csv、round4-runs.csv(84)、round4-summary.csv(28)
 scripts/         全部 harness:run-min-bench.sh(单轮)、run-matrix.sh(R1)、run-scaling.sh(R2)、
                  aggregate.py(聚合)、build-golden-world.sh、mk-workspace.sh、proc-collect.sh、smoke-paper.sh
 ticklogger/      自研 Paper 插件:逐 tick MSPT 写 CSV(System.nanoTime,零分配热路径)

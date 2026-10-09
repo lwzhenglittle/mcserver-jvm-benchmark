@@ -44,7 +44,8 @@ mkdir -p "$ROOT/runs"
 [[ $DRY -eq 0 ]] && echo "# scaling start $(date -Is) seed=$SEED total=$TOTAL combos=7 levels=${PLAYER_LEVELS[*]} reps=$RUNS warmup=600 measure=600 resume_after=$RESUME_AFTER" >> "$LOG"
 
 # count completed runs for a cell: dir ts >= RESUME_AFTER and measurement window finished
-declare -A LAUNCHED=()
+# NOTE: runs are sequential, so cell_done() already sees runs completed earlier in this
+# invocation — a separate LAUNCHED counter would double-count and under-replicate cells.
 cell_done() {
   local rt=$1 gc=$2 p=$3 d n=0
   for d in "$ROOT"/runs/*-"$rt-$gc-$WL-p$p-$WS"; do
@@ -61,13 +62,12 @@ for line in "${SORTED[@]}"; do
   runtime=${cfg%%:*}; gc=${cfg#*:}
   i=$((i+1))
   if [[ -n $RESUME_AFTER ]]; then
-    key="$cfg-$p"; have=$(cell_done "$runtime" "$gc" "$p"); done_n=$((have + ${LAUNCHED[$key]:-0}))
-    if [[ $done_n -ge $RUNS ]]; then
+    have=$(cell_done "$runtime" "$gc" "$p")
+    if [[ $have -ge $RUNS ]]; then
       [[ $DRY -eq 1 ]] && echo "[$i/$TOTAL] $runtime $gc p$p rep$r SKIP ($have done)"
       [[ $DRY -eq 0 ]] && echo "[$i/$TOTAL] $(date -Is) $runtime $gc p$p rep$r SKIP ($have done)" >> "$LOG"
       continue
     fi
-    LAUNCHED[$key]=$(( ${LAUNCHED[$key]:-0} + 1 ))
   fi
   if [[ $DRY -eq 1 ]]; then echo "[$i/$TOTAL] $runtime $gc p$p rep$r"; continue; fi
   echo "[$i/$TOTAL] $(date -Is) $runtime $gc p$p rep$r START" >> "$LOG"
