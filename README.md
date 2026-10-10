@@ -1,76 +1,180 @@
-# Paper 26.2 JVM/GC Benchmark
+# Paper 26.2 的 Java 运行环境与垃圾回收性能测试
 
-在同一台机器上测量 Paper 26.2 服务器在 7 种 JDK/GC 配置、25–150 名模拟玩家负载下的 tick 耗时(MSPT),回答两个问题:**哪个 JDK/GC 最快?过载点在哪?**
+Paper 是 Minecraft Java 版的服务器软件。本仓库比较 Paper 在不同 Java 运行环境和垃圾回收器下的性能，通过自动化客户端模拟玩家活动，记录服务器每次更新游戏状态所需的时间，观察配置差异以及玩家数量增加后的性能变化。
 
-## 结论
+仓库包含测试脚本、模拟玩家程序、性能记录插件和已完成实验的汇总数据。当前结果来自第四轮实验，完成于 2026 年 10 月 10 日：共测试 7 种配置、4 种玩家数量，每种情况重复 3 次，共 84 次测试。
 
-- **玩家 ≤100:任意默认配置即可。** 7 个配置 mean MSPT 均为 8–20ms,差距在重复间噪声内。
-- **过载点在 100→150 人之间。** 150 人时所有配置 mean MSPT 均超 50ms,保不住 20 TPS,无一幸免。
-- **过载时只有低暂停 GC 能兜底。** 150 人时 Shenandoah/ZGC(约 58–59ms)领先 G1 系(78–96ms)约 25–39%,领先 Parallel(113ms)约 48%。
-- **推荐配置:** 会冲 100+ 玩家用 **Temurin 25 + Shenandoah**(或 ZGC,两者打平;Shenandoah 堆外开销更小);玩家 ≤100 随意。**Parallel 全程最差,不建议使用。**
+## 如何理解测试指标
 
-## 实验结果
+Java 运行环境负责执行服务器程序；不同 JDK（Java 开发工具包）发行版提供不同的运行环境。垃圾回收器（GC）负责回收程序不再使用的内存，其工作方式可能影响服务器的处理速度和暂停时间。G1、Shenandoah、ZGC 和 Parallel 是本次比较的垃圾回收器名称。
 
-150 玩家(过载档,3 次重复平均,MSPT 单位 ms):
+Minecraft 服务器按一定频率更新游戏状态，每次更新称为一个 tick。正常目标是每秒更新 20 次，因此每次更新可用的时间为 50 毫秒。
 
-| 排名 | 配置 | mean MSPT | >50ms tick 占比 |
-|---|---|---|---|
-| 1 | temurin25 / Shenandoah | **58.3** | 58.9% |
-| 2 | temurin25 / ZGC | **59.2** | 62.4% |
-| 3 | oracle25 / 默认(G1) | 78.5 | 92.4% |
-| 4 | graalvmce25 / G1 | 82.8 | 94.1% |
-| 5 | openjdk25 / 默认(G1) | 87.2 | 97.0% |
-| 6 | temurin25 / G1 | 95.6 | 97.9% |
-| 7 | temurin25 / Parallel | 113.2 | 99.7% |
+| 指标 | 含义 | 阅读方式 |
+| --- | --- | --- |
+| MSPT | 服务器完成一次更新所需的毫秒数 | 数值越低，处理同类工作所需的时间越短 |
+| 平均 MSPT | 测量期间所有更新耗时的平均值 | 持续超过 50 毫秒时，服务器无法维持每秒 20 次更新 |
+| p95 / p99 | 95% / 99% 的更新耗时不超过该值 | 用于观察较慢的更新，仅看平均值可能遗漏这些情况 |
+| 超过 50 毫秒的更新占比 | 耗时超过 50 毫秒的更新占全部更新的比例 | 用于观察更新超时的频率 |
+| TPS | 服务器每秒实际完成的更新次数 | 目标为 20；达到 20 仍可能存在偶发的较长暂停 |
 
-25/50/100 玩家三档下,7 个配置 mean MSPT 均在 8–20ms,差异不超过重复间噪声。
+## 当前结论
 
-完整逐档表格与统计见 [docs/round4-novia.md](docs/round4-novia.md);逐轮原始数据见 [results/round4-runs.csv](results/round4-runs.csv)。
+以下结论适用于本次硬件、服务器配置和模拟玩家行为。
 
-## 实验方法
+- **25、50、100 名模拟玩家时，所有配置的平均耗时均低于 50 毫秒。** 各配置的平均 MSPT 范围分别为 8.40–9.81、10.63–12.69、18.11–20.30 毫秒。从维持正常更新速度的角度，这些测试没有显示出必须更换默认垃圾回收器的需求。
+- **150 名模拟玩家时，所有配置均已过载。** 平均 MSPT 均超过 50 毫秒。测试表明性能不足出现在超过 100 人、达到 150 人的范围内，但未测试中间人数，无法确定具体临界人数。
+- **过载时，Temurin 25 配合 Shenandoah 或 ZGC 的平均耗时最低。** 两者约为 58–59 毫秒，G1 配置约为 78–96 毫秒，Parallel 约为 113 毫秒。两者可以减轻本次过载情况下的性能下降，但仍无法维持每秒 20 次更新。
+- **配置选择应结合预计负载。** 对与本次测试相近的场景，25–100 人可优先采用默认 G1；预计接近本次 150 人负载时，可优先评估 Temurin 25 配合 Shenandoah 或 ZGC。两者差异不足以据此确定稳定的先后顺序。Parallel 在 150 人时平均耗时最高，不建议作为该负载下的首选。
 
-- **矩阵:** 7 个 JDK/GC 配置(openjdk25/默认、oracle25/默认、temurin25/{G1, Shenandoah, Parallel, ZGC}、graalvmce25/G1)× 4 档玩家数 {25, 50, 100, 150} × 3 次重复 = **84 轮,0 失败 0 掉线**。
-- **时长:** 每轮 600s 预热 + 600s 测量;堆固定 16G;世界 seed 固定。
-- **负载:** mineflayer 无头 bot 混合负载;bot 走原生 26.2 协议,不装 Via* 插件(已单独验证 Via 对 MSPT 无可测影响)。
-- **绑核:** 服务器进程绑核 0–7,bot 绑核 8–15。
-- **指标:** 自研 TickLogger 插件逐 tick 记录 MSPT(System.nanoTime)。
+### 测试结果
 
-### 环境(结果仅在此环境下成立)
+下表耗时单位均为毫秒。每个数值先在单次测试的正式测量时段内计算，再对 3 次重复测试取平均；最后一列仅对应 150 人。表格按 150 人时的平均耗时排列，不表示所有玩家数量下均有相同顺序。
 
-- AMD Ryzen 7 5700X(8C/16T),62GB RAM
-- **WSL2**(非裸机,governor/perf 不可控)
-- Paper **26.2-129**(sha256 锁定,要求 Java 25+),Java 25 运行时
+| Java 发行版 | 垃圾回收器 | 25 人平均 MSPT | 50 人平均 MSPT | 100 人平均 MSPT | 150 人平均 MSPT | 150 人时超过 50 毫秒的更新占比 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Eclipse Temurin 25 | Shenandoah | 9.17 | 11.03 | 18.16 | **58.25** | 58.93% |
+| Eclipse Temurin 25 | ZGC | 9.57 | 12.69 | 18.62 | **59.21** | 62.36% |
+| Oracle JDK 25 | 默认（G1） | 8.91 | 11.24 | 18.36 | 78.45 | 92.40% |
+| GraalVM Community Edition 25 | G1 | 8.40 | 11.92 | 18.37 | 82.82 | 94.09% |
+| OpenJDK 25（上游发行版） | 默认（G1） | 8.98 | 10.63 | 18.11 | 87.18 | 96.95% |
+| Eclipse Temurin 25 | G1 | 8.40 | 10.63 | 18.38 | 95.59 | 97.90% |
+| Eclipse Temurin 25 | Parallel | 9.81 | 11.17 | 20.30 | 113.18 | 99.67% |
 
-## 复现
+“默认”表示启动时未指定垃圾回收器，由 Java 运行环境选择；这些测试仍然将 Java 堆内存的初始值和最大值固定为 16 GB，并非完全使用默认启动参数。
 
-前置:sdkman 安装各 JDK(清单见 `config/jdks.yaml`)、node ≥ 18。
+详细结果、较慢更新的耗时及重复测试之间的波动见 [第四轮实验报告](docs/round4-novia.md)。逐次测试统计见 [round4-runs.csv](results/round4-runs.csv)，按配置和玩家数量汇总的数据见 [round4-summary.csv](results/round4-summary.csv)。
+
+## 测试方法与适用范围
+
+每次测试都会从同一份世界副本开始，使用相同的 Paper 程序和服务器配置。模拟玩家开始加入后，先运行 10 分钟作为预热，减小 Java 启动后优化过程对结果的影响，再正式测量 10 分钟。不同配置和人数的执行顺序会按固定规则打乱，以减小运行时间先后带来的影响。
+
+模拟玩家由 mineflayer 自动化客户端实现，无需启动游戏图形界面。第四轮使用 Minecraft 26.2 协议直接连接服务器，不安装 ViaVersion 或 ViaBackwards 协议转换插件。测试采用 `mixed` 行为：行走、跳跃、尝试挖掘和放置方块、挥动手臂，并限制活动范围，减少新地形生成对比较的影响。每个客户端进程最多控制 50 名模拟玩家，超过 100 人时降低加入速度。
+
+TickLogger 插件逐次记录更新耗时，分析时只使用正式测量时段的数据。脚本还保留垃圾回收日志、CPU 与内存采样、服务器日志和模拟玩家日志。84 次正式测试全部完成，报告记录无模拟玩家掉线。
+
+| 条件 | 本次设置 |
+| --- | --- |
+| 处理器 | AMD Ryzen 7 5700X，8 核、16 线程 |
+| 系统内存 | 62 GB |
+| 运行环境 | Windows 上的 Linux 运行环境（WSL2） |
+| 服务器 | Paper 26.2，构建编号 129；程序文件固定并记录 SHA-256 校验值 |
+| Java 版本 | 所有配置均使用 Java 25；具体发行版本见下方安装清单 |
+| Java 堆内存（用于存放程序对象的内存区域） | 初始值和最大值均为 16 GB，即 `-Xms16G -Xmx16G` |
+| 世界 | 每次恢复同一份预先生成的世界，包含实体和红石设施 |
+| 模拟操作的随机种子 | `20260930` |
+| CPU 分配 | 服务器使用逻辑 CPU 0–7，模拟玩家使用逻辑 CPU 8–15 |
+| 测试规模 | 7 种配置，4 种人数（25、50、100、150），每种情况重复 3 次，共 84 次 |
+
+模拟玩家的行为与真实玩家并不完全相同，人数不能直接作为实际服务器的容量承诺。WSL2 会受到宿主机负载影响，本次也无法完全控制 CPU 频率和调度。更换硬件、世界内容、插件或服务器配置后，需要重新测试；不同日期的实验也不宜直接比较绝对耗时。
+
+## 如何运行测试
+
+### 1. 准备依赖和服务器文件
+
+测试脚本使用 Linux 环境。需要 Bash、Python 3、Node.js 22 或更高版本、npm，以及 `rsync`、`taskset`、`bc` 等命令。当前锁定的 mineflayer 及其协议依赖要求 Node.js 22 或更高版本。
+
+Java 由 SDKMAN! 管理，脚本按以下目录查找运行环境。单次测试只需安装选用的发行版；执行全部 7 种配置时需要安装清单中的全部 4 个发行版。
+
+| 脚本中的运行环境名称 | 发行版 | SDKMAN! 安装标识 |
+| --- | --- | --- |
+| `temurin25` | Eclipse Temurin 25.0.4 | `25.0.4-tem` |
+| `oracle25` | Oracle JDK 25.0.4 | `25.0.4-oracle` |
+| `openjdk25` | 上游 OpenJDK 25.0.2 | `25.0.2-open` |
+| `graalvmce25` | GraalVM Community Edition 25.3.4，基于 Java 25 | `25.3.4+1.r25-graalce` |
+
+例如，`temurin25` 对应 `~/.sdkman/candidates/java/25.0.4-tem/bin/java`。其他发行版说明见 [JDK 清单](config/jdks.yaml)，脚本实际使用的路径见 [run-min-bench.sh](scripts/run-min-bench.sh)。
+
+还需准备以下文件：
+
+- 仓库根目录的 `paper-26.2-129.jar`。本次使用文件的 SHA-256 为 `b1d8f6bfa1b6101fa8e947b53041cb3bdf5540e7b83b6547ca19ba7edefeb083`。
+- `plugins/Chunky-Bukkit-1.5.3.jar`，用于预先生成世界地形。
+- `plugins/TickLogger.jar`，可从仓库内的 `ticklogger/TickLogger.jar` 复制。
+
+Paper、外部插件、生成的世界和完整运行日志未提交到 Git。首次获取仓库后需准备这些文件；如果要严格对照已发布的数据，还需使用原实验的同一份世界副本。
+
+以下命令均在仓库根目录执行。安装客户端依赖后应用 26.2 协议适配；每次重新执行 `npm ci` 后都需要再次应用适配。
 
 ```bash
-cd bots && npm ci
-./scripts/build-golden-world.sh   # 生成并锁定 golden world
-./scripts/smoke-paper.sh          # 冒烟测试
-
-# 单轮
-./scripts/run-min-bench.sh --runtime temurin25 --gc zgc --workload mixed \
-    --players 100 --warmup 600 --measure 600 --heap 16G \
-    --workspace workspaces/ws0 --port 25565 --cores 0-7 --botcores 8-15
-
-# 完整矩阵(7 配置 × {25,50,100,150} × 3 reps,约 28h)
-./scripts/run-scaling.sh --botversion 26.2 --workspace wsN --port 25567
-python3 scripts/aggregate.py 'runs/*'   # 聚合逐轮统计到 CSV
+npm ci --prefix bots
+node bots/add-26.2.js
 ```
 
-方法学细节与陷阱(join storm、预生界约束、时长敏感性等)见 [docs/methodology.md](docs/methodology.md)。
+### 2. 准备世界和测试工作目录
 
-## 仓库结构
+首次运行时，创建供每次测试恢复使用的世界副本：
 
-```
-bots/        mineflayer 无头玩家负载发生器
-config/      JDK 清单(jdks.yaml)、paper/server 固定配置
-docs/        spec.md、methodology.md、round4-novia.md(完整结果)、archive/(历史轮次)
-results/     聚合 CSV(round4-runs.csv 为逐轮数据)
-scripts/     harness:run-min-bench.sh(单轮)、run-scaling.sh(矩阵)、aggregate.py(聚合)等
-ticklogger/  自研 Paper 插件:逐 tick MSPT 写 CSV
+```bash
+./scripts/build-golden-world.sh
 ```
 
-更早的实验轮次已归档于 [docs/archive/](docs/archive/)。
+该脚本使用 Temurin 25，会重建仓库根目录的 `world`、`world_nether`、`world_the_end`，并覆盖 `worlds/golden/world`。已有可用的实验世界副本时可跳过此步骤。
+
+验证选用的 Java 运行环境能启动服务器，再创建保存服务器配置、插件和运行文件的独立目录：
+
+```bash
+./scripts/smoke-paper.sh temurin25
+./scripts/mk-workspace.sh repro 25567
+```
+
+第二条命令创建 `workspaces/wsrepro`，端口为 `25567`。此目录名用于下方示例，应选择尚未用于其他实验的名称。工作目录会复制根目录的插件；为保持与第四轮一致，需确保其 `plugins/` 中没有 ViaVersion 和 ViaBackwards 的程序文件。
+
+### 3. 执行单次测试
+
+以下示例使用 Temurin 25、ZGC 和 100 名模拟玩家，预热与正式测量各 10 分钟：
+
+```bash
+./scripts/run-min-bench.sh \
+  --runtime temurin25 --gc zgc --workload mixed \
+  --players 100 --warmup 600 --measure 600 --heap 16G \
+  --seed 20260930 --botversion 26.2 \
+  --workspace workspaces/wsrepro --port 25567 \
+  --cores 0-7 --botcores 8-15
+```
+
+`--runtime` 选择 Java 发行版，`--gc` 选择垃圾回收器，`--players` 设置模拟人数，`--warmup` 与 `--measure` 的单位为秒。`--cores` 和 `--botcores` 指定逻辑 CPU 编号；应根据本机 CPU 数量和线程分布调整。单次测试脚本的 `--workspace` 接收目录路径，该目录需要提前创建。
+
+### 4. 执行全部配置并导出统计
+
+执行全部配置前，需安装上方清单中的 4 个 Java 发行版。为完整实验创建新的工作目录，避免将前面的单次测试纳入本次统计；该目录的 `plugins/` 中同样需确保没有 ViaVersion 和 ViaBackwards 的程序文件。
+
+```bash
+./scripts/mk-workspace.sh full 25567
+```
+
+先查看计划，确认运行环境、人数和重复次数：
+
+```bash
+./scripts/run-scaling.sh --dry-run --botversion 26.2 \
+  --workspace wsfull --port 25567
+```
+
+执行全部 84 次测试：
+
+```bash
+./scripts/run-scaling.sh --botversion 26.2 \
+  --workspace wsfull --port 25567
+```
+
+与单次测试脚本不同，批量脚本的 `--workspace` 接收 `workspaces/` 下的目录名，此处为 `wsfull`。批量脚本固定使用上述 7 种配置、4 种人数、16 GB 堆内存，以及逻辑 CPU 0–7 和 8–15；更换机器时需检查这些设置。84 次测试仅预热和测量就需要约 28 小时，实际运行还包括启动、停止和世界恢复时间。
+
+完成后，每次测试的数据保存在 `runs/` 下的独立目录中。导出本工作目录对应的逐次测试统计：
+
+```bash
+python3 scripts/aggregate.py 'runs/*-wsfull' > results/local-runs.csv
+```
+
+CSV 中每行对应一次测试。`mean_mspt`、`p95_mspt`、`p99_mspt` 和 `over50_pct` 对应上文指标，`bot_kicks` 用于检查客户端异常记录。比较时应确认测量完整、模拟玩家数量保持稳定，并按相同配置和人数汇总重复测试。再次开展独立实验时使用新的工作目录名，可避免与已有测试混合统计。
+
+## 仓库内容与进一步阅读
+
+| 路径 | 内容 |
+| --- | --- |
+| [bots/](bots/) | 模拟玩家程序和 Minecraft 26.2 协议适配脚本 |
+| [config/](config/) | Java 发行版清单及固定的 Paper、服务器配置 |
+| [scripts/](scripts/) | 世界创建、服务器启动验证、单次与批量测试、数据汇总脚本 |
+| [ticklogger/](ticklogger/) | 逐次记录服务器更新耗时的插件源码和程序文件 |
+| [results/](results/) | 已提交的逐次测试统计和汇总 CSV |
+| [docs/](docs/) | 实验需求、测试方法和结果报告 |
+
+当前结果以 [第四轮实验报告](docs/round4-novia.md) 为准。测试设计、运行时长验证和已知问题见 [测试方法说明](docs/methodology.md)，早期实验见 [历史报告](docs/archive/)。
