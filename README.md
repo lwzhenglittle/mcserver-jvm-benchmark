@@ -1,27 +1,33 @@
 # Paper 26.2 JVM/GC Benchmark (Minecraft 1.21.x 世代)
 
-可复现的 Minecraft Paper Server JVM/GC benchmark 框架与两轮实验数据。
+可复现的 Minecraft Paper Server JVM/GC benchmark 框架与实验结论。
 目标问题:**同一台机器上,Paper 26.2 用哪个 JDK / GC 最快?过载点在哪?**
 
-## TL;DR
+## 结论(Round 4,no-Via,2026-10-10,最终)
 
-> **Round 4(no-Via 全量重做,最终结论,2026-10-10):**
-> p25-p100 全部 7 配置差异在噪声内,随便选;过载点在 p100→p150 之间;
-> p150 上 **Shenandoah/ZGC(~58-59ms)领先 G1 系(78-96ms)~25-39%,Parallel(113ms)垫底**。
-> 会冲 100+ 玩家就用 temurin25 + Shenandoah(或 ZGC)。详见 [docs/round4-novia.md](docs/round4-novia.md)。
-> 历史数据(R1/R2/R3)已移出展示,存档于 [docs/archive/](docs/archive/)(含一次时间聚块伪影的勘误记录);原始 runs/ 全部保留未删。
+> **p25-p100 全部 7 配置差异在噪声内,随便选;过载点在 p100→p150 之间;
+> p150 上 Shenandoah/ZGC(~58-59ms)领先 G1 系(78-96ms)~25-39%,Parallel(113ms)垫底。
+> 会冲 100+ 玩家就用 temurin25 + Shenandoah(或 ZGC)。**
+> 详见 [docs/round4-novia.md](docs/round4-novia.md)。
 
-## 实验总览
+矩阵:7 配置 × 4 玩家档(25/50/100/150)× 3 reps = 84 轮,600s warmup + 600s measure,
+16G 堆,workload=mixed,原生 26.2 bot,0 失败 0 掉线。
 
-| | Round 1 | Round 2 |
-|---|---|---|
-| 问题 | 11 runtime × GC × 3 workload,谁最快 | 晋级组合 × 玩家数 scaling,过载点 |
-| 组合 | 33(11 runtime/GC × 3 workload) | 7(2 baseline + 5 晋级) |
-| 轮数 | 99(33 × 3 reps) | 84(7 × 4 档 × 3 reps) |
-| 玩家 | 25 | 25 / 50 / 100 / 150 |
-| 堆 | 8G | 16G |
-| warmup/measure | 600s / 600s | 600s / 600s |
-| 结果 | 0 失败,0 掉线 | 0 失败,0 掉线 |
+p150(过载档,3 reps 平均):
+
+| 配置 | mean MSPT | p99 | >50ms tick 占比 |
+|---|---|---|---|
+| temurin25/shenandoah | **58.3** | 120.9 | 58.9% |
+| temurin25/zgc | **59.2** | 121.0 | 62.4% |
+| oracle25/default | 78.5 | 165.8 | 92.4% |
+| graalvmce25/g1 | 82.8 | 176.1 | 94.1% |
+| openjdk25/default | 87.2 | 182.3 | 97.0% |
+| temurin25/g1 | 95.6 | 215.0 | 97.9% |
+| temurin25/parallel | 113.2 | 258.6 | 99.7% |
+
+p25/p50/p100 下 7 配置 mean MSPT 8-20ms,差距 ≤ rep 间噪声。
+
+历史轮次(R1/R2/R3)结论已被本轮取代,仅存档于 [docs/archive/](docs/archive/)(含一次时间聚块伪影的勘误记录);原始 runs/ 全部保留未删。
 
 ## 仓库结构
 
@@ -47,8 +53,8 @@ cd bots && npm ci
 ./scripts/run-min-bench.sh --runtime temurin25 --gc zgc --workload mixed \
     --players 100 --warmup 600 --measure 600 --heap 16G \
     --workspace workspaces/ws0 --port 25565 --cores 0-7 --botcores 8-15
-# 矩阵
-./scripts/run-scaling.sh                 # R2:84 轮 ~28h
+# 矩阵(R4 参数:原生 26.2 bot,7 配置 × {25,50,100,150} × 3 reps,~28h)
+./scripts/run-scaling.sh --botversion 26.2 --workspace wsN --port 25567
 python3 scripts/aggregate.py 'runs/*'    # 聚合每轮统计到 CSV
 ```
 
